@@ -1,6 +1,6 @@
 from mpi4py import MPI
 import tensorflow as tf, baselines.common.tf_util as U, numpy as np
-
+import time
 class RunningMeanStd(object):
     # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
     def __init__(self, epsilon=1e-2, shape=()):
@@ -38,6 +38,7 @@ class RunningMeanStd(object):
         x = x.astype('float64')
         n = int(np.prod(self.shape))
         totalvec = np.zeros(n*2+1, 'float64')
+        # 把x拆分成3个部分，分别是求和，各项平方，以及个数。然后做多进程的规约
         addvec = np.concatenate([x.sum(axis=0).ravel(), np.square(x).sum(axis=0).ravel(), np.array([len(x)],dtype='float64')])
         MPI.COMM_WORLD.Allreduce(addvec, totalvec, op=MPI.SUM)
         self.incfiltparams(totalvec[0:n].reshape(self.shape), totalvec[n:2*n].reshape(self.shape), totalvec[2*n])
@@ -46,19 +47,21 @@ class RunningMeanStd(object):
 def test_runningmeanstd():
     for (x1, x2, x3) in [
         (np.random.randn(3), np.random.randn(4), np.random.randn(5)),
-        (np.random.randn(3,2), np.random.randn(4,2), np.random.randn(5,2)),
+        # (np.random.randn(3, 2), np.random.randn(4, 2), np.random.randn(5, 2)),
         ]:
 
         rms = RunningMeanStd(epsilon=0.0, shape=x1.shape[1:])
         U.initialize()
-
+        print("x1 %s" % x1)
+        print("x2 %s " % x2)
+        print("x3 %s " % x3)
         x = np.concatenate([x1, x2, x3], axis=0)
         ms1 = [x.mean(axis=0), x.std(axis=0)]
         rms.update(x1)
         rms.update(x2)
         rms.update(x3)
         ms2 = U.eval([rms.mean, rms.std])
-
+        print("ms1 %s, ms2 %s" % (ms1, ms2))
         assert np.allclose(ms1, ms2)
 
 @U.in_session
@@ -81,7 +84,7 @@ def test_dist():
 
     rms = RunningMeanStd(epsilon=0.0, shape=(1,))
     U.initialize()
-
+    time.sleep(comm.Get_rank())
     rms.update(x1)
     rms.update(x2)
     rms.update(x3)
@@ -91,7 +94,8 @@ def test_dist():
     def checkallclose(x,y):
         print(x,y)
         return np.allclose(x,y)
-
+    print("rms mean %s, rms std %s"%(U.eval(rms.mean), U.eval(rms.std)))
+    print("mean %s, std %s" % (bigvec.mean(axis=0), bigvec.std(axis=0)))
     assert checkallclose(
         bigvec.mean(axis=0),
         U.eval(rms.mean)
@@ -104,4 +108,6 @@ def test_dist():
 
 if __name__ == "__main__":
     # Run with mpirun -np 2 python <filename>
-    test_dist()
+    # test_dist()
+    # Run with mpirun -np 1 python <filename>
+    test_runningmeanstd()
