@@ -26,14 +26,14 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
         logger.set_level(logger.DISABLED)
 
     # Create envs.
-    env =  env = normalize(InvertedDoublePendulumEnv(), normalize_obs=False) # gym.make(env_id)
-    env = bench.Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(), str(rank)))
+    env = normalize(InvertedDoublePendulumEnv(), normalize_obs=False) # gym.make(env_id)
+    env = bench.Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(), str(rank)), allow_early_resets=True)
     gym.logger.setLevel(logging.WARN)
 
     if evaluation and rank==0:
-        eval_env = gym.make(env_id)
-        eval_env = bench.Monitor(eval_env, os.path.join(logger.get_dir(), 'gym_eval'))
-        env = bench.Monitor(env, None)
+        eval_env = normalize(InvertedDoublePendulumEnv(), normalize_obs=False) # gym.make(env_id)
+        eval_env = bench.Monitor(eval_env, os.path.join(logger.get_dir(), 'gym_eval'), allow_early_resets=True)
+        # env = bench.Monitor(env, None)
     else:
         eval_env = None
 
@@ -63,7 +63,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
     actor = Actor(nb_actions, layer_norm=layer_norm)
 
     # Seed everything to make things reproducible.
-    seed = seed + 1000000 * rank
+    seed = int(time.time() * 1000) % 1000000 + rank * 10
     logger.info('rank {}: seed={}, logdir={}'.format(rank, seed, logger.get_dir()))
     tf.reset_default_graph()
     set_global_seeds(seed)
@@ -108,7 +108,7 @@ def parse_args():
     parser.add_argument('--nb-rollout-steps', type=int, default=100)  # per epoch cycle and MPI worker
     parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
     parser.add_argument('--num-timesteps', type=int, default=None)
-    boolean_flag(parser, 'evaluation', default=False)
+    boolean_flag(parser, 'evaluation', default=True)
     args = parser.parse_args()
     # we don't directly specify timesteps for this script, so make sure that if we do specify them
     # they agree with the other parameters
