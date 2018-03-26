@@ -123,6 +123,7 @@ class DDPG(object):
         self.critic_tf = denormalize(tf.clip_by_value(self.normalized_critic_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
         self.normalized_critic_with_actor_tf = critic(normalized_obs0, self.actor_tf, reuse=True)
         self.critic_with_actor_tf = denormalize(tf.clip_by_value(self.normalized_critic_with_actor_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
+        # use for update  q value.
         Q_obs1 = denormalize(target_critic(normalized_obs1, target_actor(normalized_obs1)), self.ret_rms)
         self.target_Q = self.rewards + (1. - self.terminals1) * gamma * Q_obs1
 
@@ -172,8 +173,13 @@ class DDPG(object):
 
     def setup_critic_optimizer(self):
         logger.info('setting up critic optimizer')
+        # critic_target 目标 value 是一个 placeholder
+        # ret_rms 来做正则化
+        # normalized_critic_tf 这是我们自己当前的value，有两个输入：s和a
         normalized_critic_target_tf = tf.clip_by_value(normalize(self.critic_target, self.ret_rms), self.return_range[0], self.return_range[1])
+        # 计算均方误差
         self.critic_loss = tf.reduce_mean(tf.square(self.normalized_critic_tf - normalized_critic_target_tf))
+        # 增加l2 正则项
         if self.critic_l2_reg > 0.:
             critic_reg_vars = [var for var in self.critic.trainable_vars if 'kernel' in var.name and 'output' not in var.name]
             for var in critic_reg_vars:
@@ -185,6 +191,7 @@ class DDPG(object):
             )
             self.critic_loss += critic_reg
         critic_shapes = [var.get_shape().as_list() for var in self.critic.trainable_vars]
+        # 这里做 x*y干什么？ 只是用于输出而已
         critic_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in critic_shapes])
         logger.info('  critic shapes: {}'.format(critic_shapes))
         logger.info('  critic params: {}'.format(critic_nb_params))
