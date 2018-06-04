@@ -70,6 +70,7 @@ def batch_to_seq(h, nbatch, nsteps, flat=False):
         h = tf.reshape(h, [nbatch, nsteps])
     else:
         h = tf.reshape(h, [nbatch, nsteps, -1])
+    # 按维度【第一维度，也就是rollout-size】 分割成多个子tensor。 squeeze只是去掉结果的某一size恒为1的维度
     return [tf.squeeze(v, [1]) for v in tf.split(axis=1, num_or_size_splits=nsteps, value=h)]
 
 def seq_to_batch(h, flat = False):
@@ -226,8 +227,9 @@ class EpisodeStats:
         self.rewbuffer = deque(maxlen=40)  # rolling buffer for episode rewards
         self.nsteps = nsteps
         self.nenvs = nenvs
-
+    # 对于Explore 的episodeStates， 你需要记录所有的信息，
     def feed(self, rewards, masks):
+        # done is the masks:
         rewards = np.reshape(rewards, [self.nenvs, self.nsteps])
         masks = np.reshape(masks, [self.nenvs, self.nsteps])
         for i in range(0, self.nenvs):

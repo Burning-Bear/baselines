@@ -69,9 +69,9 @@ class Model(object):
         MU = tf.placeholder(tf.float32, [nbatch, nact]) # mu's
         LR = tf.placeholder(tf.float32, [])
         eps = 1e-6
-
+        # step model 只有１个batch size =1 ， train model 的batch size = nstep
         step_model = policy(sess, ob_space, ac_space, nenvs, 1, nstack, reuse=False)
-        train_model = policy(sess, ob_space, ac_space, nenvs, nsteps + 1, nstack, reuse=True)
+        train_model = policy(sess, ob_space, ac_space, nenvs, nsteps + 1, nstack, reuse=True)# 这个model其实是前面的reuse
 
         params = find_trainable_variables("model")
         print("Params {}".format(len(params)))
@@ -118,7 +118,7 @@ class Model(object):
         # Truncated importance sampling
         adv = qret - v
         logf = tf.log(f_i + eps)
-        gain_f = logf * tf.stop_gradient(adv * tf.minimum(c, rho_i))  # [nenvs * nsteps]
+        gain_f = logf * tf.stop_gradient(adv * tf.minimum(c, rho_i))  # 这个做的是他的截断的重要性采样 [nenvs * nsteps] # tf.minimum(c, rho_i)
         loss_f = -tf.reduce_mean(gain_f)
 
         # Bias correction for the truncation
@@ -325,6 +325,7 @@ def learn(policy, env, seed, nsteps=20, nstack=4, total_timesteps=int(80e6), q_c
     ob_space = env.observation_space
     ac_space = env.action_space
     num_procs = len(env.remotes) # HACK
+    # nenvs: 环境的个数， 等价于cpu的使用的个数
     model = Model(policy=policy, ob_space=ob_space, ac_space=ac_space, nenvs=nenvs, nsteps=nsteps, nstack=nstack,
                   num_procs=num_procs, ent_coef=ent_coef, q_coef=q_coef, gamma=gamma,
                   max_grad_norm=max_grad_norm, lr=lr, rprop_alpha=rprop_alpha, rprop_epsilon=rprop_epsilon,

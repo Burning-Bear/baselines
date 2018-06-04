@@ -11,12 +11,25 @@ class MpiAdam(object):
         self.epsilon = epsilon
         self.scale_grad_by_procs = scale_grad_by_procs
         size = sum(U.numel(v) for v in var_list)
+        self.size = size
         self.m = np.zeros(size, 'float32')
         self.v = np.zeros(size, 'float32')
         self.t = 0
-        self.setfromflat = U.SetFromFlat(var_list)
+        # 这是一个函数,用于完成varlist 的内容的赋值
+        self.setfromflat = U.SetFromFlat(var_list, dtype=tf.float32)
+        # 这是一个函数,用于把var_list 的值取出来
         self.getflat = U.GetFlat(var_list)
         self.comm = MPI.COMM_WORLD if comm is None else comm
+
+    def param_pass(self, other_opt):
+        self.m = other_opt.m.copy()
+        self.v = other_opt.v.copy()
+        self.t = other_opt.t
+
+    def param_reset(self):
+        self.m = np.zeros(self.size, 'float32')
+        self.v = np.zeros(self.size, 'float32')
+        self.t = 0
 
     def update(self, localg, stepsize):
         if self.t % 100 == 0:
@@ -65,7 +78,6 @@ class MpiAdam(object):
 def test_MpiAdam():
     np.random.seed(0)
     tf.set_random_seed(0)
-
     a = tf.Variable(np.random.randn(3).astype('float32'))
     b = tf.Variable(np.random.randn(2,5).astype('float32'))
     loss = tf.reduce_sum(tf.square(a)) + tf.reduce_sum(tf.sin(b))

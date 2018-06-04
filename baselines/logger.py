@@ -27,9 +27,11 @@ class SeqWriter(object):
         raise NotImplementedError
 
 class HumanOutputFormat(KVWriter, SeqWriter):
-    def __init__(self, filename_or_file):
+    def __init__(self, filename_or_file, record_period=20):
+        self.record_period = record_period
+        self.last_write_time = time.time()
         if isinstance(filename_or_file, str):
-            self.file = open(filename_or_file, 'wt')
+            self.file = open(filename_or_file, 'wt', buffering=4096)
             self.own_file = True
         else:
             assert hasattr(filename_or_file, 'read'), 'expected file or str, got %s'%filename_or_file
@@ -55,7 +57,7 @@ class HumanOutputFormat(KVWriter, SeqWriter):
             valwidth = max(map(len, key2str.values()))
 
         # Write out the data
-        dashes = '-' * (keywidth + valwidth + 7)
+        dashes = '-' * (keywidth + valwidth + 14)
         lines = [dashes]
         for (key, val) in sorted(key2str.items()):
             lines.append('| %s%s | %s%s |' % (
@@ -65,10 +67,15 @@ class HumanOutputFormat(KVWriter, SeqWriter):
                 ' ' * (valwidth - len(val)),
             ))
         lines.append(dashes)
+        current_time = time.time()
         self.file.write('\n'.join(lines) + '\n')
+        current_time = time.time()
+        if (current_time - self.last_write_time) >= self.record_period:
+            # Flush the output to the file
+            print("flush log")
+            self.file.flush()
+            self.last_write_time = current_time
 
-        # Flush the output to the file
-        self.file.flush()
 
     def _truncate(self, s):
         return s[:20] + '...' if len(s) > 23 else s
@@ -77,7 +84,12 @@ class HumanOutputFormat(KVWriter, SeqWriter):
         for arg in seq:
             self.file.write(arg)
         self.file.write('\n')
-        self.file.flush()
+        current_time = time.time()
+        if (current_time - self.last_write_time) >= self.record_period:
+            print("flush log")
+            # Flush the output to the file
+            self.file.flush()
+            self.last_write_time = current_time
 
     def close(self):
         if self.own_file:

@@ -12,7 +12,7 @@ from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from mpi4py import MPI
 
-def make_atari_env(env_id, num_env, seed, wrapper_kwargs=None, start_index=0):
+def make_atari_env(env_id, num_env, seed, wrapper_kwargs=None, start_index=0, video=False):
     """
     Create a wrapped, monitored SubprocVecEnv for Atari.
     """
@@ -21,7 +21,16 @@ def make_atari_env(env_id, num_env, seed, wrapper_kwargs=None, start_index=0):
         def _thunk():
             env = make_atari(env_id)
             env.seed(seed + rank)
-            env = Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(), str(rank)))
+            if video:
+                from gym import wrappers
+                if rank == 0:
+                    env = wrappers.Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(), 'gym_eval'),
+                                                                                 resume=True,
+                                                                                 video_callable=lambda episode_id: episode_id % 1 == 0)
+                else:
+                    env = Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(), str(rank)))
+            else:
+                env = Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(), str(rank)))
             return wrap_deepmind(env, **wrapper_kwargs)
         return _thunk
     set_global_seeds(seed)

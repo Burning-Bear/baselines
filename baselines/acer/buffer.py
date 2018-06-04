@@ -23,6 +23,7 @@ class Buffer(object):
         self.num_in_buffer = 0
 
     def has_atleast(self, frames):
+        # 用于buffer 开始使用的阈值的判断
         # Frames per env, so total (nenv * frames) Frames needed
         # Each buffer loc has nenv * nsteps frames
         return self.num_in_buffer >= (frames // self.nsteps)
@@ -63,7 +64,7 @@ class Buffer(object):
             self.dones = np.empty([self.size] + list(dones.shape), dtype=np.bool)
             self.masks = np.empty([self.size] + list(masks.shape), dtype=np.bool)
 
-        self.enc_obs[self.next_idx] = enc_obs
+        self.enc_obs[self.next_idx] = enc_obs # todo why 2500?
         self.actions[self.next_idx] = actions
         self.rewards[self.next_idx] = rewards
         self.mus[self.next_idx] = mus

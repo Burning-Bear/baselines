@@ -30,12 +30,7 @@ import glob
 import os
 import matplotlib.pyplot as plt
 from gym.envs.registration import registry, register
-register(
-    id='CartPole-v2',
-    entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=5000,
-    reward_threshold=4750.0,
-)
+
 
 
 # file_name = './results/2017-11-16 16:11:54.pkl'

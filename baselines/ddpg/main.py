@@ -13,11 +13,18 @@ from baselines.ddpg.memory import Memory
 from baselines.ddpg.noise import *
 
 import gym
+from gym.envs import register
 import tensorflow as tf
 from mpi4py import MPI
 from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
-from rllab.envs.normalized_env import normalize
-from SLBDAO.tester import Tester
+
+
+register(
+    id='HalfCheetah-v3',
+    entry_point='gym.envs.mujoco:HalfCheetahEnv',
+    max_episode_steps=1000,
+)
+
 
 def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
     # Configure things.
@@ -26,14 +33,13 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
         logger.set_level(logger.DISABLED)
 
     # Create envs.
-
-    env = normalize(InvertedDoublePendulumEnv(), normalize_obs=False) # gym.make(env_id)
+    env =gym.make('HalfCheetah-v3') # normalize(InvertedDoublePendulumEnv(), normalize_obs=False) # gym.make(env_id)
     env = bench.Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(), str(rank)), allow_early_resets=True)
     gym.logger.setLevel(logging.WARN)
 
 
     if evaluation and rank==0:
-        eval_env = normalize(InvertedDoublePendulumEnv(), normalize_obs=False) # gym.make(env_id)
+        eval_env = gym.make('HalfCheetah-v3')# normalize(InvertedDoublePendulumEnv(), normalize_obs=False) # gym.make(env_id)
         eval_env = bench.Monitor(eval_env, os.path.join(logger.get_dir(), 'gym_eval'), allow_early_resets=True)
         # env = bench.Monitor(env, None)
     else:
@@ -60,7 +66,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
             raise RuntimeError('unknown noise type "{}"'.format(current_noise_type))
 
     # Configure components.
-    memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape)
+    memory = Memory(limit=int(1e5), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape)
     critic = Critic(layer_norm=layer_norm)
     actor = Actor(nb_actions, layer_norm=layer_norm)
 
@@ -96,7 +102,7 @@ def parse_args():
     boolean_flag(parser, 'normalize-observations', default=True)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--critic-l2-reg', type=float, default=1e-2)
-    parser.add_argument('--batch-size', type=int, default=64)  # per MPI worker
+    parser.add_argument('--batch-size', type=int, default=128)  # per MPI worker
     parser.add_argument('--actor-lr', type=float, default=1e-4)
     parser.add_argument('--critic-lr', type=float, default=1e-3)
     boolean_flag(parser, 'popart', default=False)
